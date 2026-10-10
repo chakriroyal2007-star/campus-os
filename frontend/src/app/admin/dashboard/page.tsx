@@ -40,21 +40,9 @@ export default function AdminDashboardPage() {
       try {
         const res = await apiFetch<AdminDashboardSummary>('/admin/dashboard');
         setSummary(res);
-      } catch {
-        // Fallback default state
-        setSummary({
-          institutionId: '1',
-          institutionName: 'Apex Institute of Technology',
-          institutionCode: 'INST001',
-          totalStudents: 0,
-          totalTeachers: 0,
-          totalDepartments: 0,
-          totalPrograms: 0,
-          totalSubjects: 0,
-          totalCourseOfferings: 0,
-          totalActiveTerms: 0,
-          totalClassSessions: 0,
-        });
+      } catch (err: any) {
+        // Honest error handling with no fabricated institution
+        setSummary(null);
       } finally {
         setLoading(false);
       }
@@ -89,7 +77,7 @@ export default function AdminDashboardPage() {
               <ShieldCheck className="w-5 h-5 text-indigo-400" />
               <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">College Administration</span>
             </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">{summary?.institutionName}</h2>
+            <h2 className="text-2xl font-bold text-white tracking-tight">{summary?.institutionName || 'College Administration'}</h2>
             <p className="text-xs text-slate-400">
               Manage academic hierarchy, student enrollments, faculty teaching assignments, and campus operations.
             </p>
