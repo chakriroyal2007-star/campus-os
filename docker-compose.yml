@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: campusos-postgres
+    environment:
+      POSTGRES_DB: campusos
+      POSTGRES_USER: campusos_admin
+      POSTGRES_PASSWORD: campusos_secret_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campusos_admin -d campusos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: campusos-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campusos-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/campusos
+      SPRING_DATASOURCE_USERNAME: campusos_admin
+      SPRING_DATASOURCE_PASSWORD: campusos_secret_password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      CAMPUSOS_JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: campusos-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:

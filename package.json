@@ -1,0 +1,14 @@
+{
+  "name": "campus-os",
+  "version": "1.0.0",
+  "description": "CampusOS Higher Education Operating System",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend start",
+    "test": "npm --prefix frontend test"
+  },
+  "keywords": ["campus", "education", "lms", "university", "spring-boot", "nextjs"],
+  "author": "CampusOS Team",
+  "license": "MIT"
+}
