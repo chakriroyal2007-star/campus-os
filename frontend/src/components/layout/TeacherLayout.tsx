@@ -17,13 +17,15 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Users
 } from 'lucide-react';
 import { getStoredUser, setStoredUser } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const TEACHER_NAV = [
   { href: '/teacher/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/teacher/classrooms', label: 'My Classrooms & Codes', icon: Users },
   { href: '/teacher/attendance', label: 'Take Attendance', icon: UserCheck },
   { href: '/teacher/assignments', label: 'Assignments & Grading', icon: FileCheck2 },
   { href: '/teacher/quizzes', label: 'Quizzes & Banks', icon: HelpCircle },

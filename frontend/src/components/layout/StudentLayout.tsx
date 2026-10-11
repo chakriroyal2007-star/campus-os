@@ -23,13 +23,15 @@ import {
   Bell,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  GraduationCap
 } from 'lucide-react';
 import { getStoredUser, setStoredUser, apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/student/dashboard', label: 'Home', icon: LayoutDashboard },
+  { href: '/student/classrooms', label: 'Classrooms & Join', icon: GraduationCap },
   { href: '/student/timetable', label: 'Timetable', icon: Calendar },
   { href: '/student/attendance', label: 'Attendance', icon: UserCheck },
   { href: '/student/courses', label: 'Subjects', icon: BookOpen },

@@ -53,6 +53,7 @@ interface CampusDatabase {
   messages: any[];
   parents: any[];
   otps: any[];
+  classrooms: any[];
 }
 
 function hashPassword(pass: string): string {
@@ -343,18 +344,90 @@ function getInitialDatabase(): CampusDatabase {
         institutionId: instId,
       },
     ],
+    classrooms: [
+      {
+        id: 'cls-dsa-sec-a',
+        name: 'Data Structures & Algorithms - Section A',
+        subjectCode: 'CS-DSA-301',
+        subjectName: 'Data Structures and Algorithms',
+        department: 'Computer Science and Engineering',
+        academicYear: '2026-2027',
+        semester: 'Semester 3',
+        section: 'A',
+        description: 'Advanced data structures including balanced binary trees, graph traversals, and dynamic programming algorithms.',
+        enrollmentPolicy: 'OPEN',
+        status: 'ACTIVE',
+        facultyId: 'user-teach-001',
+        facultyName: 'Prof. Ananya Rao',
+        facultyEmail: 'faculty@campus.edu',
+        joinCode: 'DSA742',
+        enrolledStudents: [
+          {
+            studentId: 'user-stu-001',
+            studentName: 'Rahul Chakri',
+            studentEmail: 'rahul.demo@campus.edu',
+            studentIdNumber: 'CS2026-001',
+            department: 'Computer Science and Engineering',
+            section: 'A',
+            joinedAt: '2026-08-15T09:00:00Z',
+            status: 'ENROLLED',
+          },
+          {
+            studentId: 'user-stu-002',
+            studentName: 'Sneha Patel',
+            studentEmail: 'sneha.patel@campus.edu',
+            studentIdNumber: 'CS2026-002',
+            department: 'Computer Science and Engineering',
+            section: 'A',
+            joinedAt: '2026-08-16T10:30:00Z',
+            status: 'ENROLLED',
+          },
+        ],
+        announcements: [
+          {
+            id: 'ann-01',
+            title: 'Welcome to DSA Lab & Classroom',
+            content: 'Please ensure your development environment is setup with GCC / Clang / Python 3 for weekly problem sets.',
+            authorName: 'Prof. Ananya Rao',
+            createdAt: '2026-08-15T10:00:00Z',
+          },
+        ],
+        assignments: [
+          {
+            id: 'asg-01',
+            title: 'Binary Search Tree Balancing',
+            description: 'Implement rotation mechanisms for AVL trees and benchmark against standard BST.',
+            dueDate: '2026-10-25T23:59:59Z',
+            maxPoints: 50,
+            createdAt: '2026-10-01T12:00:00Z',
+          },
+        ],
+        createdAt: '2026-08-15T08:00:00Z',
+        updatedAt: '2026-08-15T08:00:00Z',
+      },
+    ],
   };
 }
 
 let memoryDb: CampusDatabase | null = null;
 
 function getDb(): CampusDatabase {
-  if (memoryDb) return memoryDb;
+  if (memoryDb) {
+    if (!memoryDb.classrooms) {
+      memoryDb.classrooms = getInitialDatabase().classrooms;
+    }
+    return memoryDb;
+  }
   try {
     if (fs.existsSync(STORAGE_FILE)) {
       const data = fs.readFileSync(STORAGE_FILE, 'utf-8');
       memoryDb = JSON.parse(data);
-      if (memoryDb) return memoryDb;
+      if (memoryDb) {
+        if (!memoryDb.classrooms) {
+          memoryDb.classrooms = getInitialDatabase().classrooms;
+        }
+        return memoryDb;
+      }
     }
   } catch {}
   memoryDb = getInitialDatabase();
@@ -367,6 +440,43 @@ function saveDb(db: CampusDatabase) {
   try {
     fs.writeFileSync(STORAGE_FILE, JSON.stringify(db, null, 2), 'utf-8');
   } catch {}
+}
+
+function generateSecureJoinCode(existingCodes: Set<string>): string {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const bytes = crypto.randomBytes(6);
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars[bytes[i] % chars.length];
+    }
+    if (!existingCodes.has(code)) {
+      return code;
+    }
+  }
+  return 'CP' + crypto.randomBytes(2).toString('hex').toUpperCase();
+}
+
+function getAuthUser(request: NextRequest, db: CampusDatabase, body?: any): UserAccount | undefined {
+  const authHeader = request.headers.get('authorization') || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (token) {
+    const found = db.users.find((u) => token.includes(u.id));
+    if (found) return found;
+    const exact = db.users.find((u) => u.token === token);
+    if (exact) return exact;
+  }
+  if (body) {
+    if (body.userId) {
+      const u = db.users.find((u) => u.id === body.userId);
+      if (u) return u;
+    }
+    if (body.email) {
+      const u = db.users.find((u) => u.email.toLowerCase() === body.email.toLowerCase());
+      if (u) return u;
+    }
+  }
+  return undefined;
 }
 
 function createSessionResponse(user: UserAccount, db: CampusDatabase) {
@@ -1181,6 +1291,294 @@ async function handleRequest(request: NextRequest, { params }: { params: { path:
       return NextResponse.json({ verified: true, message: 'OTP verified successfully.' });
     }
     return NextResponse.json({ verified: false, message: 'Invalid or expired OTP.' }, { status: 400 });
+  }
+
+  // --- G. CLASSROOMS & JOIN CODES ENGINE ---
+
+  // GET /classrooms/faculty & /teacher/classrooms
+  if ((targetPath === 'classrooms/faculty' || targetPath === 'teacher/classrooms') && method === 'GET') {
+    const user = getAuthUser(request, db);
+    const facultyClassrooms = (db.classrooms || []).filter((c) => {
+      if (!user) return true; // development fallback
+      return (
+        c.facultyId === user.id ||
+        c.facultyEmail.toLowerCase() === user.email.toLowerCase() ||
+        user.roles.includes('ROLE_ADMIN') ||
+        user.roles.includes('ROLE_COLLEGE_ADMIN')
+      );
+    });
+    return NextResponse.json(facultyClassrooms);
+  }
+
+  // POST /classrooms/create
+  if (targetPath === 'classrooms/create' && method === 'POST') {
+    const user = getAuthUser(request, db, body) || db.users.find((u) => u.roles.includes('ROLE_TEACHER')) || db.users[0];
+    const {
+      name,
+      subjectCode,
+      subjectName,
+      department,
+      academicYear,
+      semester,
+      section,
+      description,
+      enrollmentPolicy,
+    } = body;
+
+    if (!name || !subjectCode || !subjectName) {
+      return NextResponse.json(
+        { message: 'Classroom Name, Subject Code, and Subject Name are required fields.' },
+        { status: 400 }
+      );
+    }
+
+    db.classrooms = db.classrooms || [];
+    const existingCodes = new Set(db.classrooms.map((c) => (c.joinCode || '').toUpperCase()));
+    const joinCode = generateSecureJoinCode(existingCodes);
+
+    const newClassroom = {
+      id: `cls-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: name.trim(),
+      subjectCode: subjectCode.trim().toUpperCase(),
+      subjectName: subjectName.trim(),
+      department: department || 'Computer Science and Engineering',
+      academicYear: academicYear || '2026-2027',
+      semester: semester || 'Semester 3',
+      section: section ? section.trim().toUpperCase() : 'A',
+      description: description || '',
+      enrollmentPolicy: enrollmentPolicy || 'OPEN',
+      status: 'ACTIVE',
+      facultyId: user.id,
+      facultyName: `Prof. ${user.firstName} ${user.lastName}`.trim(),
+      facultyEmail: user.email,
+      joinCode: joinCode,
+      enrolledStudents: [], // Zero fake students on creation!
+      announcements: [
+        {
+          id: `ann-${Date.now()}`,
+          title: `Welcome to ${name.trim()}`,
+          content: `Classroom created. Share join code ${joinCode} with students for verified enrollment.`,
+          authorName: `Prof. ${user.firstName} ${user.lastName}`.trim(),
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      assignments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.classrooms.unshift(newClassroom);
+    saveDb(db);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Classroom created successfully!',
+      classroom: newClassroom,
+    });
+  }
+
+  // POST /classrooms/join
+  if (targetPath === 'classrooms/join' && method === 'POST') {
+    const user = getAuthUser(request, db, body) || db.users.find((u) => u.roles.includes('ROLE_STUDENT')) || db.users[0];
+    const codeInput = (body.joinCode || body.code || '').trim().toUpperCase();
+
+    if (!codeInput) {
+      return NextResponse.json({ message: 'Please provide a valid classroom join code.' }, { status: 400 });
+    }
+
+    db.classrooms = db.classrooms || [];
+    const classroom = db.classrooms.find((c) => (c.joinCode || '').toUpperCase() === codeInput);
+
+    if (!classroom) {
+      return NextResponse.json(
+        { message: 'Invalid classroom join code. Please verify the code with your course instructor.' },
+        { status: 404 }
+      );
+    }
+
+    if (classroom.status === 'CLOSED' || classroom.status === 'ARCHIVED') {
+      return NextResponse.json(
+        { message: 'This classroom is closed or archived. New enrollments are not accepted.' },
+        { status: 400 }
+      );
+    }
+
+    // Check duplicate enrollment
+    const alreadyEnrolled = (classroom.enrolledStudents || []).some(
+      (s: any) => s.studentId === user.id || s.studentEmail.toLowerCase() === user.email.toLowerCase()
+    );
+
+    if (alreadyEnrolled) {
+      return NextResponse.json(
+        { message: 'You are already enrolled in this classroom.' },
+        { status: 400 }
+      );
+    }
+
+    const isPending = classroom.enrollmentPolicy === 'APPROVAL_REQUIRED';
+    const enrollmentRecord = {
+      studentId: user.id,
+      studentName: `${user.firstName} ${user.lastName}`.trim(),
+      studentEmail: user.email,
+      studentIdNumber: user.studentIdNumber || `STU-${user.id.slice(-4).toUpperCase()}`,
+      department: user.departmentId
+        ? db.departments.find((d) => d.id === user.departmentId)?.name || 'Computer Science and Engineering'
+        : 'Computer Science and Engineering',
+      section: user.section || 'A',
+      joinedAt: new Date().toISOString(),
+      status: isPending ? 'PENDING' : 'ENROLLED',
+    };
+
+    classroom.enrolledStudents = classroom.enrolledStudents || [];
+    classroom.enrolledStudents.push(enrollmentRecord);
+    classroom.updatedAt = new Date().toISOString();
+    saveDb(db);
+
+    return NextResponse.json({
+      success: true,
+      message: isPending
+        ? 'Join request submitted! Awaiting instructor approval.'
+        : `Successfully enrolled in ${classroom.name}!`,
+      classroom: classroom,
+      status: enrollmentRecord.status,
+    });
+  }
+
+  // GET /classrooms/student & /student/classrooms
+  if ((targetPath === 'classrooms/student' || targetPath === 'student/classrooms') && method === 'GET') {
+    const user = getAuthUser(request, db);
+    db.classrooms = db.classrooms || [];
+
+    const enrolledClassrooms = db.classrooms.filter((c) => {
+      if (!user) return true;
+      return (c.enrolledStudents || []).some(
+        (s: any) => s.studentId === user.id || s.studentEmail.toLowerCase() === user.email.toLowerCase()
+      );
+    });
+
+    return NextResponse.json(enrolledClassrooms);
+  }
+
+  // POST /classrooms/rotate-code
+  if (targetPath === 'classrooms/rotate-code' && method === 'POST') {
+    const user = getAuthUser(request, db, body) || db.users.find((u) => u.roles.includes('ROLE_TEACHER'));
+    const { classroomId } = body;
+    db.classrooms = db.classrooms || [];
+    const cls = db.classrooms.find((c) => c.id === classroomId);
+
+    if (!cls) {
+      return NextResponse.json({ message: 'Classroom not found.' }, { status: 404 });
+    }
+
+    const existingCodes = new Set(db.classrooms.map((c) => (c.joinCode || '').toUpperCase()));
+    const newCode = generateSecureJoinCode(existingCodes);
+    cls.joinCode = newCode;
+    cls.updatedAt = new Date().toISOString();
+    saveDb(db);
+
+    return NextResponse.json({
+      success: true,
+      newJoinCode: newCode,
+      message: 'Classroom join code rotated successfully. Share the new code with students.',
+    });
+  }
+
+  // POST /classrooms/leave
+  if (targetPath === 'classrooms/leave' && method === 'POST') {
+    const user = getAuthUser(request, db, body);
+    if (!user) {
+      return NextResponse.json({ message: 'Unauthorized.' }, { status: 401 });
+    }
+    const { classroomId } = body;
+    db.classrooms = db.classrooms || [];
+    const cls = db.classrooms.find((c) => c.id === classroomId);
+    if (!cls) {
+      return NextResponse.json({ message: 'Classroom not found.' }, { status: 404 });
+    }
+
+    cls.enrolledStudents = (cls.enrolledStudents || []).filter(
+      (s: any) => s.studentId !== user.id && s.studentEmail.toLowerCase() !== user.email.toLowerCase()
+    );
+    cls.updatedAt = new Date().toISOString();
+    saveDb(db);
+
+    return NextResponse.json({ success: true, message: 'You have left the classroom.' });
+  }
+
+  // POST /classrooms/announcements
+  if (targetPath === 'classrooms/announcements' && method === 'POST') {
+    const user = getAuthUser(request, db, body) || db.users.find((u) => u.roles.includes('ROLE_TEACHER')) || db.users[0];
+    const { classroomId, title, content } = body;
+    db.classrooms = db.classrooms || [];
+    const cls = db.classrooms.find((c) => c.id === classroomId);
+    if (!cls) {
+      return NextResponse.json({ message: 'Classroom not found.' }, { status: 404 });
+    }
+
+    const newAnn = {
+      id: `ann-${Date.now()}`,
+      title: (title || 'Announcement').trim(),
+      content: (content || '').trim(),
+      authorName: `Prof. ${user.firstName} ${user.lastName}`.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    cls.announcements = cls.announcements || [];
+    cls.announcements.unshift(newAnn);
+    cls.updatedAt = new Date().toISOString();
+    saveDb(db);
+
+    return NextResponse.json({ success: true, announcement: newAnn, message: 'Announcement posted to classroom!' });
+  }
+
+  // POST /classrooms/approve-student
+  if (targetPath === 'classrooms/approve-student' && method === 'POST') {
+    const { classroomId, studentId, action } = body;
+    db.classrooms = db.classrooms || [];
+    const cls = db.classrooms.find((c) => c.id === classroomId);
+    if (!cls) {
+      return NextResponse.json({ message: 'Classroom not found.' }, { status: 404 });
+    }
+
+    const student = (cls.enrolledStudents || []).find((s: any) => s.studentId === studentId);
+    if (!student) {
+      return NextResponse.json({ message: 'Student enrollment record not found.' }, { status: 404 });
+    }
+
+    if (action === 'REJECT') {
+      cls.enrolledStudents = cls.enrolledStudents.filter((s: any) => s.studentId !== studentId);
+    } else {
+      student.status = 'ENROLLED';
+    }
+
+    cls.updatedAt = new Date().toISOString();
+    saveDb(db);
+
+    return NextResponse.json({
+      success: true,
+      message: `Student enrollment ${action === 'REJECT' ? 'rejected' : 'approved'}.`,
+    });
+  }
+
+  // GET /classrooms/:id
+  if (targetPath.startsWith('classrooms/') && pathParts.length === 2 && method === 'GET') {
+    const classroomId = pathParts[1];
+    db.classrooms = db.classrooms || [];
+    const cls = db.classrooms.find((c) => c.id === classroomId);
+    if (cls) {
+      return NextResponse.json(cls);
+    }
+    return NextResponse.json({ message: 'Classroom not found' }, { status: 404 });
+  }
+
+  // GET /academic/departments
+  if (targetPath === 'academic/departments' && method === 'GET') {
+    return NextResponse.json(db.departments || []);
+  }
+
+  // GET /academic/subjects
+  if (targetPath === 'academic/subjects' && method === 'GET') {
+    return NextResponse.json(db.subjects || []);
   }
 
   // Fallback 200 clean empty array for unrecognized endpoints to prevent UI crashes

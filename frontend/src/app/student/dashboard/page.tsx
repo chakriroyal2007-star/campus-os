@@ -19,7 +19,8 @@ import {
   ArrowRight,
   HelpCircle,
   AlertCircle,
-  BookOpen
+  BookOpen,
+  GraduationCap
 } from 'lucide-react';
 
 export default function StudentDashboardPage() {
@@ -74,6 +75,25 @@ export default function StudentDashboardPage() {
           <div className="absolute right-0 bottom-0 opacity-10 translate-x-8 translate-y-8">
             <BookOpen className="w-64 h-64 text-white" />
           </div>
+        </div>
+
+        {/* Join Classroom Banner */}
+        <div className="bg-white border border-indigo-100 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Enrolled Classrooms & Join Codes</h3>
+              <p className="text-xs text-slate-500">Have a 6-character code from your professor? Join your academic classroom to view live announcements and materials.</p>
+            </div>
+          </div>
+          <Link href="/student/classrooms">
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 shrink-0">
+              Join Classroom
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </Link>
         </div>
 
         {/* Top Key Metrics */}
