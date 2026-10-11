@@ -97,14 +97,25 @@ export default function StudentClassroomsPage() {
 
     setJoining(true);
     try {
+      const currentUser = user || getStoredUser();
       const res: any = await apiFetch('/classrooms/join', {
         method: 'POST',
-        body: JSON.stringify({ joinCode: cleanCode }),
+        body: JSON.stringify({
+          joinCode: cleanCode,
+          userId: currentUser?.userId || currentUser?.id,
+          email: currentUser?.email,
+        }),
       });
 
-      if (res.success) {
+      if (res.success || res.classroom) {
         setJoinSuccess(res.message || 'Successfully joined classroom!');
         setJoinCodeInput('');
+        if (res.classroom) {
+          setClassrooms((prev) => {
+            const exists = prev.some((c) => c.id === res.classroom.id);
+            return exists ? prev : [res.classroom, ...prev];
+          });
+        }
         await loadStudentClassrooms();
       } else {
         setJoinError(res.message || 'Unable to join classroom.');

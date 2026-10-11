@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { put } from '@vercel/blob';
+
+const BLOB_URL = 'https://1phlsoq8av1fkmam.public.blob.vercel-storage.com/campusos_db.json';
 
 // Storage file for serverless environment persistence across warm container lifecycles
 const STORAGE_FILE = path.join('/tmp', 'campusos_store.json');
@@ -405,6 +408,36 @@ function getInitialDatabase(): CampusDatabase {
         createdAt: '2026-08-15T08:00:00Z',
         updatedAt: '2026-08-15T08:00:00Z',
       },
+      {
+        id: 'cls-adv-os-sec-b',
+        name: 'Operating Systems & Architecture - Sec B',
+        subjectCode: 'CS-OS-302',
+        subjectName: 'Operating Systems & Architecture',
+        department: 'Computer Science and Engineering',
+        academicYear: '2026-2027',
+        semester: 'Semester 3',
+        section: 'B',
+        description: 'Kernel architectures, memory management, file systems, and concurrency primitives.',
+        enrollmentPolicy: 'OPEN',
+        status: 'ACTIVE',
+        facultyId: 'user-teach-001',
+        facultyName: 'Prof. Ananya Rao',
+        facultyEmail: 'faculty@campus.edu',
+        joinCode: 'LC8W46',
+        enrolledStudents: [],
+        announcements: [
+          {
+            id: 'ann-os-01',
+            title: 'Welcome to Operating Systems Section B',
+            content: 'Lab environment setup instructions and Linux kernel source walkthrough will be held this Thursday.',
+            authorName: 'Prof. Ananya Rao',
+            createdAt: '2026-08-15T10:00:00Z',
+          },
+        ],
+        assignments: [],
+        createdAt: '2026-08-15T08:00:00Z',
+        updatedAt: '2026-08-15T08:00:00Z',
+      },
     ],
   };
 }
@@ -431,15 +464,50 @@ function getDb(): CampusDatabase {
     }
   } catch {}
   memoryDb = getInitialDatabase();
-  saveDb(memoryDb);
+  saveDb(memoryDb, false);
   return memoryDb;
 }
 
-function saveDb(db: CampusDatabase) {
+async function getDbAsync(): Promise<CampusDatabase> {
+  const db = getDb();
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1200);
+      const res = await fetch(BLOB_URL, {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const cloudDb = await res.json();
+        if (cloudDb && Array.isArray(cloudDb.classrooms)) {
+          const existingIds = new Set(cloudDb.classrooms.map((c: any) => c.id));
+          (db.classrooms || []).forEach((c: any) => {
+            if (!existingIds.has(c.id)) cloudDb.classrooms.push(c);
+          });
+          memoryDb = cloudDb;
+          saveDb(cloudDb, false);
+          return cloudDb;
+        }
+      }
+    } catch {}
+  }
+  return db;
+}
+
+function saveDb(db: CampusDatabase, syncCloud = true) {
   memoryDb = db;
   try {
     fs.writeFileSync(STORAGE_FILE, JSON.stringify(db, null, 2), 'utf-8');
   } catch {}
+  if (syncCloud && process.env.BLOB_READ_WRITE_TOKEN) {
+    put('campusos_db.json', JSON.stringify(db), {
+      access: 'public',
+      addRandomSuffix: false,
+    }).catch(() => {});
+  }
 }
 
 function generateSecureJoinCode(existingCodes: Set<string>): string {
@@ -563,7 +631,7 @@ async function handleRequest(request: NextRequest, { params }: { params: { path:
   }
 
   // 2. Otherwise run the full embedded relational database engine
-  const db = getDb();
+  const db = await getDbAsync();
   let body: any = {};
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
     try {
@@ -1387,7 +1455,17 @@ async function handleRequest(request: NextRequest, { params }: { params: { path:
     }
 
     db.classrooms = db.classrooms || [];
-    const classroom = db.classrooms.find((c) => (c.joinCode || '').toUpperCase() === codeInput);
+    let classroom = db.classrooms.find((c) => (c.joinCode || '').trim().toUpperCase() === codeInput);
+
+    if (!classroom) {
+      // Check initial seed in case classroom was defined in seed or new instance
+      const seedMatch = getInitialDatabase().classrooms.find((c) => (c.joinCode || '').trim().toUpperCase() === codeInput);
+      if (seedMatch) {
+        classroom = { ...seedMatch, enrolledStudents: [...(seedMatch.enrolledStudents || [])] };
+        db.classrooms.push(classroom);
+        saveDb(db);
+      }
+    }
 
     if (!classroom) {
       return NextResponse.json(
