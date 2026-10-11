@@ -23,6 +23,11 @@ const nextConfig = {
         destination: '/student/dashboard',
         permanent: false,
       },
+      {
+        source: '/parent',
+        destination: '/parent/dashboard',
+        permanent: false,
+      },
     ];
   },
 };

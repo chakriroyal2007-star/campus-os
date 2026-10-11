@@ -6,6 +6,7 @@ import {
   GraduationCap,
   BookOpen,
   ShieldCheck,
+  HeartHandshake,
   ArrowRight,
   Sparkles,
   CheckCircle2,
@@ -31,7 +32,7 @@ export default function WelcomeGalaxyPage() {
 
   // Auth form states
   const [isRegister, setIsRegister] = useState(false);
-  const [role, setRole] = useState<'ROLE_STUDENT' | 'ROLE_TEACHER' | 'ROLE_COLLEGE_ADMIN'>('ROLE_STUDENT');
+  const [role, setRole] = useState<'ROLE_STUDENT' | 'ROLE_TEACHER' | 'ROLE_COLLEGE_ADMIN' | 'ROLE_PARENT'>('ROLE_STUDENT');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +64,7 @@ export default function WelcomeGalaxyPage() {
     };
   }, []);
 
-  const handleOpenAuth = (defaultRole?: 'ROLE_STUDENT' | 'ROLE_TEACHER' | 'ROLE_COLLEGE_ADMIN') => {
+  const handleOpenAuth = (defaultRole?: 'ROLE_STUDENT' | 'ROLE_TEACHER' | 'ROLE_COLLEGE_ADMIN' | 'ROLE_PARENT') => {
     if (defaultRole) setRole(defaultRole);
     setAuthModalOpen(true);
     setExploreModalOpen(false);
@@ -114,6 +115,8 @@ export default function WelcomeGalaxyPage() {
         setStoredUser(data);
         if (data.roles.includes('ROLE_TEACHER')) {
           router.push('/teacher/dashboard');
+        } else if (data.roles.includes('ROLE_PARENT')) {
+          router.push('/parent/dashboard');
         } else {
           router.push('/student/dashboard');
         }
@@ -136,6 +139,8 @@ export default function WelcomeGalaxyPage() {
           router.push('/admin/dashboard');
         } else if (data.roles.includes('ROLE_TEACHER')) {
           router.push('/teacher/dashboard');
+        } else if (data.roles.includes('ROLE_PARENT')) {
+          router.push('/parent/dashboard');
         } else {
           router.push('/student/dashboard');
         }
@@ -258,7 +263,7 @@ export default function WelcomeGalaxyPage() {
 
         {/* Interactive Quick Portal Cards */}
         <div
-          className={`pointer-events-auto grid grid-cols-1 sm:grid-cols-3 gap-3.5 w-full max-w-3xl mt-14 transition-all duration-1000 delay-500 ${
+          className={`pointer-events-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 w-full max-w-4xl mt-14 transition-all duration-1000 delay-500 ${
             sequenceStage >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -309,6 +314,22 @@ export default function WelcomeGalaxyPage() {
               Terms, branches, sections, offerings & allocation.
             </p>
           </button>
+
+          <button
+            onClick={() => handleOpenAuth('ROLE_PARENT')}
+            className="p-4 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 backdrop-blur-xl text-left transition-all duration-200 group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+              <HeartHandshake className="w-4 h-4" />
+            </div>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center justify-between">
+              Parent Portal
+              <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+            </h4>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Attendance alerts, marks, timetable & academic records.
+            </p>
+          </button>
         </div>
       </main>
 
@@ -339,7 +360,7 @@ export default function WelcomeGalaxyPage() {
             </button>
 
             {/* Role Switcher */}
-            <div className="grid grid-cols-3 p-1 bg-slate-900/90 rounded-2xl mb-6 border border-slate-800">
+            <div className="grid grid-cols-4 p-1 bg-slate-900/90 rounded-2xl mb-6 border border-slate-800">
               <button
                 type="button"
                 onClick={() => setRole('ROLE_STUDENT')}
@@ -376,6 +397,18 @@ export default function WelcomeGalaxyPage() {
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Admin
               </button>
+              <button
+                type="button"
+                onClick={() => setRole('ROLE_PARENT')}
+                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  role === 'ROLE_PARENT'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <HeartHandshake className="w-3.5 h-3.5" />
+                Parent
+              </button>
             </div>
 
             <div className="mb-5">
@@ -386,6 +419,8 @@ export default function WelcomeGalaxyPage() {
                         ? 'Student'
                         : role === 'ROLE_TEACHER'
                         ? 'Faculty'
+                        : role === 'ROLE_PARENT'
+                        ? 'Guardian'
                         : 'College Admin'
                     }`
                   : 'Sign in to CampusOS'}
